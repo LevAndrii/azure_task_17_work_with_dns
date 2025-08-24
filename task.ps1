@@ -27,8 +27,16 @@ Write-Host "Creating web network security group..."
 $webHttpRule = New-AzNetworkSecurityRuleConfig -Name "web" -Description "Allow HTTP" `
    -Access Allow -Protocol Tcp -Direction Inbound -Priority 100 -SourceAddressPrefix `
    Internet -SourcePortRange * -DestinationAddressPrefix * -DestinationPortRange 80,443
+$allowVNet8080 = New-AzNetworkSecurityRuleConfig -Name "Allow-VNet-8080" `
+    -Description "Allow VNet access to 8080" `
+    -Access Allow -Protocol Tcp -Direction Inbound `
+    -Priority 200 `
+    -SourceAddressPrefix "VirtualNetwork" `
+    -SourcePortRange * `
+    -DestinationAddressPrefix * `
+    -DestinationPortRange 8080
 $webNsg = New-AzNetworkSecurityGroup -ResourceGroupName $resourceGroupName -Location $location -Name `
-   $webSubnetName -SecurityRules $webHttpRule
+   $webSubnetName -SecurityRules $webHttpRule,$allowVNet8080
 
 Write-Host "Creating mngSubnet network security group..."
 $mngSshRule = New-AzNetworkSecurityRuleConfig -Name "ssh" -Description "Allow SSH" `
@@ -100,9 +108,11 @@ do {
 Write-Host "Web VM registered in DNS."
 
 Write-Host "Creating CNAME record in DNS zone ..."
-New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName `
+$recordSet = New-AzPrivateDnsRecordSet -ResourceGroupName $resourceGroupName `
     -ZoneName $privateDnsZoneName `
     -Name "todo" `
     -RecordType CNAME `
-    -Ttl 3600 `
-    -Cname "webserver.$privateDnsZoneName"
+    -Ttl 3600
+
+Add-AzPrivateDnsRecordConfig -RecordSet $recordSet -Cname "webserver.$privateDnsZoneName"
+Set-AzPrivateDnsRecordSet -RecordSet $recordSet
